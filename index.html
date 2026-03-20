@@ -254,6 +254,21 @@ tbody tr:hover .ei{opacity:1}
 #zov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:600;cursor:zoom-out;align-items:center;justify-content:center;padding:18px}
 #zov img{max-width:100%;max-height:100%;border-radius:7px;object-fit:contain}
 
+/* Payment preview card on expense form */
+#pay-preview-card{transition:background .3s,border-color .3s;animation:fadeSlideIn .25s ease}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+#ppv-amt{transition:color .2s}
+
+/* Pay Now button in outstanding table */
+.pay-now-btn{background:var(--blue);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.pay-now-btn:hover{background:var(--blue-dk);transform:translateY(-1px)}
+.pay-now-btn:active{transform:translateY(0)}
+.bal-due{font-family:var(--mono);font-weight:600;color:var(--red)}
+.bal-ok{font-family:var(--mono);font-weight:500;color:var(--green)}
+/* Payment delete icon */
+.pdel{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 5px;transition:color .15s}
+.pdel:hover{color:var(--red)}
+
 @media(max-width:768px){
   .drow{grid-template-columns:1fr 1fr}
   .fg2,.mgrid{grid-template-columns:1fr}
@@ -305,6 +320,7 @@ tbody tr:hover .ei{opacity:1}
   </div>
   <div class="sb-nav">
     <div class="sn on" id="sn-exp" onclick="switchMode('exp',this)">Expense</div>
+    <div class="sn" id="sn-pay" onclick="switchMode('pay',this)">Payments</div>
     <div class="sn" id="sn-imp" onclick="switchMode('imp',this)">Imprest</div>
     <div class="sn" id="sn-xl" onclick="switchMode('xl',this)">Import</div>
   </div>
@@ -350,11 +366,6 @@ tbody tr:hover .ei{opacity:1}
       </select>
       <select class="fs" id="f-yr" onchange="applyF()" style="flex:1;min-width:70px"></select>
       <div class="fsep"></div>
-      <span class="fl">Status</span>
-      <select class="fs" id="f-st" onchange="applyF()" style="flex:1;min-width:80px">
-        <option value="">All</option>
-        <option value="pending">Pending</option><option value="approved">Approved</option><option value="paid">Paid</option>
-      </select>
       <span class="fl">Type</span>
       <select class="fs" id="f-et" onchange="applyF()" style="flex:1;min-width:90px">
         <option value="">All</option>
@@ -386,8 +397,28 @@ tbody tr:hover .ei{opacity:1}
 
       <div class="fsec">💰 Amount</div>
       <div class="fg2">
-        <div class="fg"><label class="req">Total Cost (₦)</label><div class="aw"><span class="cu">₦</span><input type="number" id="f-amt" placeholder="0.00" step="0.01" min="0"></div></div>
-        <div class="fg"><label class="req">Amount Paid (₦)</label><div class="aw"><span class="cu">₦</span><input type="number" id="f-paid" placeholder="0.00" step="0.01" min="0"></div></div>
+        <div class="fg"><label class="req">Total Cost (₦)</label><div class="aw"><span class="cu">₦</span><input type="number" id="f-amt" placeholder="0.00" step="0.01" min="0" oninput="onAmountChange()"></div></div>
+        <div class="fg">
+          <label class="req">Amount to be Paid (₦)</label>
+          <div class="aw"><span class="cu">₦</span><input type="number" id="f-paid" placeholder="0.00 — triggers payment" step="0.01" min="0" oninput="onPayAmountChange()"></div>
+          <div style="font-size:10px;color:var(--blue);font-family:var(--mono);margin-top:3px" id="f-paid-hint" style="display:none">💡 Filling this activates the payment form</div>
+        </div>
+      </div>
+
+      <!-- Live payment preview — appears when Amount to be Paid is filled -->
+      <div id="pay-preview-card" style="display:none;background:var(--blue-lt);border:1.5px solid var(--blue-md);border-radius:10px;padding:12px 15px;margin-top:4px;margin-bottom:4px">
+        <div style="font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--blue-dp);margin-bottom:8px;display:flex;align-items:center;gap:7px">
+          💳 Payment Preview — will be auto-recorded on save
+          <span id="pay-preview-status" style="background:var(--green);color:white;border-radius:20px;padding:1px 8px;font-size:9px">ACTIVE</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div><div style="font-size:9px;color:var(--blue-dp);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px">Amount</div><div id="ppv-amt" style="font-size:15px;font-weight:600;font-family:var(--mono);color:var(--blue-dp)">₦0</div></div>
+          <div><div style="font-size:9px;color:var(--blue-dp);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px">Pay To</div><div id="ppv-payee" style="font-size:12px;font-weight:500;color:var(--ink)">—</div></div>
+          <div><div style="font-size:9px;color:var(--blue-dp);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px">Channel</div><div id="ppv-channel" style="font-size:12px;color:var(--ink)">—</div></div>
+          <div><div style="font-size:9px;color:var(--blue-dp);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px">From Account</div><div id="ppv-bank" style="font-size:11px;color:var(--ink)">—</div></div>
+          <div><div style="font-size:9px;color:var(--blue-dp);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px">Voucher No.</div><div id="ppv-ref" style="font-size:11px;font-family:var(--mono);color:var(--ink)">—</div></div>
+          <div><div style="font-size:9px;color:var(--blue-dp);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px">Balance</div><div id="ppv-balance" style="font-size:11px;font-family:var(--mono);color:var(--muted)">—</div></div>
+        </div>
       </div>
 
       <div class="fsec">🏷️ Classification</div>
@@ -419,13 +450,26 @@ tbody tr:hover .ei{opacity:1}
       <div class="fsec">🏦 Payment Details</div>
       <div class="fg2">
         <div class="fg"><label class="req">Payment Through</label>
-          <select id="f-pm">
+          <select id="f-pm" onchange="toggleExpBankPicker();updatePayPreview()">
             <option value="">— Select method —</option>
             <option value="bank">Bank Transfer</option>
             <option value="imprest_cash">Imprest Cash</option>
           </select>
         </div>
-        <div class="fg"><label class="req">Payment To</label><input type="text" id="f-pto" placeholder="Who was payment made to?"></div>
+        <div class="fg"><label class="req">Payment To</label><input type="text" id="f-pto" placeholder="Who was payment made to?" oninput="updatePayPreview()"></div>
+        <!-- Sending account picker — visible only when Bank Transfer is selected -->
+        <div class="fg full" id="f-bank-picker-wrap" style="display:none">
+          <label>Our Bank Account (Sending)</label>
+          <select id="f-bank-acct" onchange="fillBankDetails(this.value,'f-bank-hidden','f-acctno-hidden');updatePayPreview()">
+            <option value="">— Select Hopestone account —</option>
+            <option value="Sterling|0098570141">Sterling Bank — 0098570141</option>
+            <option value="Sterling|0095508587">Sterling Bank — 0095508587</option>
+            <option value="Sterling|0095508714">Sterling Bank — 0095508714</option>
+            <option value="Moniepoint|8033950102">Moniepoint — 8033950102</option>
+          </select>
+        </div>
+        <input type="hidden" id="f-bank-hidden">
+        <input type="hidden" id="f-acctno-hidden">
         <!-- Vendor Contact is OPTIONAL -->
         <div class="fg"><label>Vendor Contact</label><input type="tel" id="f-vcon" placeholder="Phone number (optional)"></div>
       </div>
@@ -433,14 +477,7 @@ tbody tr:hover .ei{opacity:1}
       <div class="fsec">✅ Approval</div>
       <div class="fg2">
         <div class="fg"><label class="req">Approved By</label><input type="text" id="f-apby" placeholder="Name of approving officer"></div>
-        <div class="fg"><label class="req">Approval Voucher No.</label><input type="text" id="f-vno" placeholder="e.g. APV-2026-001"></div>
-        <div class="fg full"><label class="req">Status</label>
-          <div class="spills" id="sp-main">
-            <span class="sp on" data-v="pending" onclick="setSt('pending',this,'sp-main')">⏳ Pending</span>
-            <span class="sp" data-v="approved" onclick="setSt('approved',this,'sp-main')">✓ Approved</span>
-            <span class="sp" data-v="paid" onclick="setSt('paid',this,'sp-main')">💳 Paid</span>
-          </div>
-        </div>
+        <div class="fg"><label class="req">Approval Voucher No.</label><input type="text" id="f-vno" placeholder="e.g. APV-2026-001" oninput="updatePayPreview()"></div>
         <div class="fg full"><label>Additional Notes (optional)</label><textarea id="f-notes" placeholder="Any additional notes..."></textarea></div>
       </div>
       <div class="acts">
@@ -458,7 +495,7 @@ tbody tr:hover .ei{opacity:1}
         </div>
       </div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Date</th><th>Item</th><th>Account</th><th>Type</th><th>Total</th><th>Via</th><th>Approved</th><th>Status</th></tr></thead>
+        <thead><tr><th>Date</th><th>Item</th><th>Account</th><th>Type</th><th>Total</th><th>Via</th><th>Approved</th></tr></thead>
         <tbody id="etbody"><tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted)">No expenses yet</td></tr></tbody>
       </table></div>
     </div>
@@ -501,6 +538,123 @@ tbody tr:hover .ei{opacity:1}
     </div>
   </div>
 
+  <!-- PAYMENTS PANEL -->
+  <div class="pnl" id="pnl-pay">
+
+    <!-- ⚠️ Unrecorded transfer alert banner (shown when bank-transfer expenses have no linked payment) -->
+    <div id="transfer-alert-banner" style="display:none;background:#fff8ec;border:1.5px solid var(--orange);border-radius:11px;padding:12px 16px;margin-bottom:12px;gap:12px;align-items:flex-start">
+      <div style="font-size:18px;flex-shrink:0">⚠️</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:#7a4400;margin-bottom:4px">Unrecorded Bank Transfer Payments</div>
+        <div style="font-size:12px;color:#9a5c10;margin-bottom:8px">The following expenses were paid by Bank Transfer but have no payment record yet. Please record them to keep your accounts accurate.</div>
+        <div id="transfer-alert-list" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="drow" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+      <div class="dc or"><div class="dc-l">Total Outstanding</div><div class="dc-v" id="pay-outstanding">₦0</div><div class="dc-s" id="pay-out-cnt">0 unpaid expenses</div></div>
+      <div class="dc bl"><div class="dc-l">Paid This Month</div><div class="dc-v" id="pay-month-tot">₦0</div><div class="dc-s" id="pay-month-cnt">0 payments</div></div>
+      <div class="dc gr"><div class="dc-l">All Payments Made</div><div class="dc-v" id="pay-all-tot">₦0</div><div class="dc-s" id="pay-all-cnt">0 records</div></div>
+    </div>
+
+    <!-- Outstanding Expenses -->
+    <div class="fc" style="margin-bottom:14px">
+      <div class="fct">Outstanding Balances</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Expenses where Total Cost &gt; Amount Paid. Click <strong style="color:var(--blue)">💳 Pay Now</strong> to pre-fill the payment form.</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Date</th><th>Item</th><th>Payee</th><th>Total Cost</th><th>Paid So Far</th><th>Balance Due</th><th></th></tr></thead>
+          <tbody id="out-tbody"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Record Payment form -->
+    <div class="fc" id="pay-form-card">
+      <div class="fct">Record a Payment</div>
+
+      <!-- Linked expense banner -->
+      <div id="pay-linked-banner" style="display:none;background:var(--blue-lt);border:1px solid var(--blue-md);border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:12px;color:var(--blue-dp);align-items:center;justify-content:space-between;gap:10px">
+        <span>📎 Paying against: <strong id="pay-linked-name"></strong> &nbsp;|&nbsp; Balance: <strong id="pay-linked-bal"></strong></span>
+        <button onclick="unlinkExpense()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:var(--mono)">✕ Unlink</button>
+      </div>
+      <input type="hidden" id="pay-exp-id">
+
+      <div class="fsec">💳 Basic Payment Info</div>
+      <div class="fg2">
+        <div class="fg"><label class="req">Payment Date</label><input type="date" id="pay-dt"></div>
+        <div class="fg"><label class="req">Amount (₦)</label><div class="aw"><span class="cu">₦</span><input type="number" id="pay-amt" placeholder="0.00" step="0.01" min="0"></div></div>
+        <div class="fg"><label class="req">Payee Name</label><input type="text" id="pay-payee" placeholder="Name of who was paid"></div>
+        <div class="fg"><label>Payee Contact</label><input type="tel" id="pay-contact" placeholder="Phone number (optional)"></div>
+        <div class="fg"><label class="req">Payment Channel</label>
+          <select id="pay-channel" onchange="toggleBankFields()">
+            <option value="">— Select channel —</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="cheque">Cheque</option>
+            <option value="cash">Cash</option>
+            <option value="pos">POS</option>
+            <option value="mobile_transfer">Mobile Transfer (USSD/App)</option>
+            <option value="imprest_cash">Imprest Cash</option>
+          </select>
+        </div>
+        <div class="fg"><label class="req">Reference / Cheque No.</label><input type="text" id="pay-ref" placeholder="Transfer ref, cheque no., teller no."></div>
+      </div>
+
+      <!-- Sending bank (our account) -->
+      <div class="fsec">🏦 Sending Account (Our Bank)</div>
+      <div class="fg2" id="sending-bank-fields">
+        <div class="fg full"><label class="req">Our Bank Account (Sending)</label>
+          <select id="pay-bank-acct" onchange="fillBankDetails(this.value,'pay-bank','pay-acctno')">
+            <option value="">— Select Hopestone account —</option>
+            <option value="Sterling|0098570141">Sterling Bank — 0098570141</option>
+            <option value="Sterling|0095508587">Sterling Bank — 0095508587</option>
+            <option value="Sterling|0095508714">Sterling Bank — 0095508714</option>
+            <option value="Moniepoint|8033950102">Moniepoint — 8033950102</option>
+          </select>
+        </div>
+        <input type="hidden" id="pay-bank">
+        <input type="hidden" id="pay-acctno">
+      </div>
+
+      <!-- Receiving bank (payee's account) -->
+      <div class="fsec">🏦 Receiving Account (Payee's Bank)</div>
+      <div class="fg2">
+        <div class="fg"><label>Payee's Bank Name</label><input type="text" id="pay-recv-bank" placeholder="e.g. First Bank, UBA"></div>
+        <div class="fg"><label>Payee's Account No.</label><input type="text" id="pay-recv-acctno" placeholder="Payee account number"></div>
+        <div class="fg full"><label>Payee's Account Name</label><input type="text" id="pay-recv-acctname" placeholder="Name on payee's account"></div>
+      </div>
+
+      <div class="fsec">📝 Notes</div>
+      <div class="fg2">
+        <div class="fg full"><label>Description / Notes (optional)</label><textarea id="pay-notes" rows="2" placeholder="Any additional details about this payment..."></textarea></div>
+      </div>
+
+      <div class="acts">
+        <button class="bsv" id="pay-save-btn" onclick="savePayment()"><span id="pay-save-lbl">Record Payment</span></button>
+        <button class="bclr" onclick="clrPayForm()">Clear Form</button>
+      </div>
+    </div>
+
+    <!-- Payment History Table -->
+    <div class="tc">
+      <div class="tb">
+        <div class="tt">Payment History <span class="rp" id="pay-cnt">0</span></div>
+        <div style="display:flex;align-items:center;gap:7px">
+          <button class="fexport" onclick="exportPaymentsXL()">⬇ Export Excel</button>
+          <button class="rbtn" onclick="loadPayments()">↻</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>Date</th><th>Payee</th><th>Amount</th><th>Channel</th>
+          <th>Reference</th><th>From (Our Acct)</th><th>To (Payee Acct)</th><th>Linked Expense</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody id="pay-tbody"><tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">No payments recorded yet</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+
   <!-- IMPORT PANEL -->
   <div class="pnl" id="pnl-xl">
     <div class="icard">
@@ -522,7 +676,7 @@ tbody tr:hover .ei{opacity:1}
       <div id="xl-area" style="display:none">
         <div class="isum" id="xl-sum"></div>
         <div class="ptw"><table class="pt2">
-          <thead><tr><th>#</th><th>Date</th><th>Item</th><th>Amount</th><th>Type</th><th>Status</th><th>✓</th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>Item</th><th>Amount</th><th>Type</th><th>✓</th></tr></thead>
           <tbody id="xl-body"></tbody>
         </table></div>
         <div style="margin-top:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -582,13 +736,6 @@ tbody tr:hover .ei{opacity:1}
         <div class="fg"><label>Vendor Contact</label><input type="tel" id="e-vcon"></div>
         <div class="fg"><label>Approved By</label><input type="text" id="e-apby"></div>
         <div class="fg"><label>Voucher No.</label><input type="text" id="e-vno"></div>
-        <div class="fg full"><label>Status</label>
-          <div class="spills" id="sp-edit">
-            <span class="sp on" data-v="pending" onclick="setSt('pending',this,'sp-edit')">⏳ Pending</span>
-            <span class="sp" data-v="approved" onclick="setSt('approved',this,'sp-edit')">✓ Approved</span>
-            <span class="sp" data-v="paid" onclick="setSt('paid',this,'sp-edit')">💳 Paid</span>
-          </div>
-        </div>
         <div class="fg full"><label>Notes</label><textarea id="e-notes" rows="2"></textarea></div>
       </div>
     </div>
@@ -633,13 +780,15 @@ const ACC={
 const C2K={};Object.entries(ACC).forEach(function([k,v]){C2K[v.c]=k;});
 
 const expMap={};
-let aUUIDs={},curSt='pending',expenses=[],filtered=[],impRecs=[];
+let aUUIDs={},expenses=[],filtered=[],impRecs=[];
 let selAccKey='',aTabF='all',sbOpen=true;
-let editId=null,editSt='pending',eaKey='';
+let editId=null,eaKey='';
 let recDataUrl=null;
 
 document.getElementById('f-dt').value=new Date().toISOString().split('T')[0];
 document.getElementById('imp-dt').value=new Date().toISOString().split('T')[0];
+// pay-dt initialised in loadPayments setup
+var _payDtEl=document.getElementById('pay-dt');if(_payDtEl)_payDtEl.value=new Date().toISOString().split('T')[0];
 autoMonth();
 function autoMonth(){
   var d=document.getElementById('f-dt').value;
@@ -656,7 +805,7 @@ function showLogin(){document.getElementById('login-screen').classList.remove('h
 function showApp(user){
   document.getElementById('login-screen').classList.add('hidden');document.getElementById('app').style.display='flex';
   var em=user.email||'';document.getElementById('unm').textContent=em;document.getElementById('uav').textContent=em.charAt(0).toUpperCase();
-  handleResize();fetchUUIDs().then(function(){loadExp();loadImp();});populateYears();
+  handleResize();fetchUUIDs().then(function(){loadExp();loadImp();loadPayments();});populateYears();
 }
 async function doLogin(){
   var em=document.getElementById('li-email').value.trim(),pw=document.getElementById('li-pw').value;
@@ -687,8 +836,8 @@ function goImprest(){switchMode('imp',document.getElementById('sn-imp'));}
 function switchMode(mode,el){
   document.querySelectorAll('.sn').forEach(function(n){n.classList.remove('on');});el.classList.add('on');
   document.querySelectorAll('.pnl').forEach(function(p){p.classList.remove('on');});document.getElementById('pnl-'+mode).classList.add('on');
-  var T={exp:'Record Expense',imp:'Imprest Management',xl:'Import from Excel'};
-  var S={exp:'Upload receipt to sidebar, then fill in all expense details below',imp:'Record imprest cash receipts — balance updates automatically',xl:'Bulk import expense data from Excel or CSV'};
+  var T={exp:'Record Expense',pay:'Payments',imp:'Imprest Management',xl:'Import from Excel'};
+  var S={exp:'Upload receipt to sidebar, then fill in all expense details below',pay:'Track outstanding balances, record payments and view full payment history',imp:'Record imprest cash receipts — balance updates automatically',xl:'Bulk import expense data from Excel or CSV'};
   document.getElementById('ptitle').textContent=T[mode];document.getElementById('psub').textContent=S[mode];
   if(window.innerWidth<=768)closeSB();
 }
@@ -778,10 +927,6 @@ document.addEventListener('click',function(e){
   var eaEl=document.getElementById('e-asi');if(eaEl&&!eaEl.closest('div[style]').contains(e.target))closeEDD();
 });
 
-function setSt(v,el,grp){
-  if(grp==='sp-main')curSt=v;else editSt=v;
-  document.querySelectorAll('#'+grp+' .sp').forEach(function(p){p.classList.remove('on');});el.classList.add('on');
-}
 
 // ── YEARS & FILTER ──
 function populateYears(){
@@ -791,13 +936,12 @@ function populateYears(){
 }
 function applyF(){
   var mon=document.getElementById('f-mon').value,yr=document.getElementById('f-yr').value;
-  var st=document.getElementById('f-st').value,et=document.getElementById('f-et').value;
+  var et=document.getElementById('f-et').value;
   filtered=expenses.filter(function(e){
     var ok=true;
     if(mon&&yr)ok=ok&&e.date&&e.date.startsWith(yr+'-'+mon);
     else if(yr)ok=ok&&e.date&&e.date.startsWith(yr);
     else if(mon)ok=ok&&e.date&&e.date.slice(5,7)===mon;
-    if(st)ok=ok&&e.status===st;
     if(et)ok=ok&&e.expense_type===et;
     return ok;
   });
@@ -805,14 +949,15 @@ function applyF(){
 }
 function clearF(){
   document.getElementById('f-mon').value='';document.getElementById('f-yr').value='';
-  document.getElementById('f-st').value='';document.getElementById('f-et').value='';
+  document.getElementById('f-et').value='';
   filtered=expenses.slice();renderExp();updateStats();
 }
 
-// ── VALIDATION — vendor contact is optional ──
+// ── VALIDATION — amount-to-be-paid and vendor contact are optional ──
 function validateForm(){
   var fields=[
-    {id:'f-dt'},{id:'f-item'},{id:'f-desc'},{id:'f-amt'},{id:'f-paid'},
+    {id:'f-dt'},{id:'f-item'},{id:'f-desc'},{id:'f-amt'},
+    // f-paid is optional — payment activates automatically if filled
     {id:'f-et2'},{id:'f-pm'},{id:'f-pto'},{id:'f-apby'},{id:'f-vno'},
     // f-vcon removed — optional
   ];
@@ -829,27 +974,136 @@ function validateForm(){
 }
 
 // ── SAVE EXPENSE ──
+// ── LIVE PAYMENT PREVIEW ──
+// Called when Total Cost changes — auto-fill Amount to be Paid if it's blank
+function onAmountChange(){
+  var amt=parseFloat(document.getElementById('f-amt').value)||0;
+  var paid=parseFloat(document.getElementById('f-paid').value)||0;
+  if(!paid&&amt>0){
+    // Don't auto-fill, just update the preview if already showing
+  }
+  updatePayPreview();
+}
+
+// Called when Amount to be Paid changes — the key trigger
+function onPayAmountChange(){
+  var paid=parseFloat(document.getElementById('f-paid').value)||0;
+  var card=document.getElementById('pay-preview-card');
+  var hint=document.getElementById('f-paid-hint');
+  if(paid>0){
+    card.style.display='block';
+    if(hint)hint.style.display='block';
+    updatePayPreview();
+  } else {
+    card.style.display='none';
+    if(hint)hint.style.display='none';
+  }
+}
+
+// Refreshes all preview values from current form state
+function updatePayPreview(){
+  var paid=parseFloat(document.getElementById('f-paid').value)||0;
+  if(!paid)return; // nothing to show
+  var amt=parseFloat(document.getElementById('f-amt').value)||0;
+  var payTo=document.getElementById('f-pto').value.trim();
+  var pm=document.getElementById('f-pm').value;
+  var vno=document.getElementById('f-vno').value.trim();
+  var bankAcct=document.getElementById('f-bank-acct').value;
+  var balance=amt-paid;
+
+  var chanLabel={bank:'Bank Transfer',imprest_cash:'Imprest Cash'};
+  var bankLabel=bankAcct?bankAcct.replace('|',' — '):'—';
+
+  document.getElementById('ppv-amt').textContent='₦'+paid.toLocaleString('en-NG',{minimumFractionDigits:2});
+  document.getElementById('ppv-payee').textContent=payTo||'—';
+  document.getElementById('ppv-channel').textContent=chanLabel[pm]||'—';
+  document.getElementById('ppv-bank').textContent=bankLabel;
+  document.getElementById('ppv-ref').textContent=vno||'—';
+  document.getElementById('ppv-balance').textContent=balance>0?'₦'+balance.toLocaleString('en-NG',{minimumFractionDigits:2})+' still owed':'Fully paid';
+
+  // Colour the preview card based on whether it's full or partial payment
+  var card=document.getElementById('pay-preview-card');
+  if(amt>0&&paid>=amt){
+    card.style.background='var(--green-lt)';card.style.borderColor='#74c69d';
+    document.getElementById('pay-preview-status').style.background='var(--green)';
+    document.getElementById('pay-preview-status').textContent='FULL PAYMENT';
+  } else if(paid>0){
+    card.style.background='var(--blue-lt)';card.style.borderColor='var(--blue-md)';
+    document.getElementById('pay-preview-status').style.background='var(--blue)';
+    document.getElementById('pay-preview-status').textContent='PART PAYMENT';
+  }
+}
+
 async function saveExp(){
   if(!validateForm())return;
-  var btn=document.getElementById('bsv');btn.disabled=true;document.getElementById('bsv-l').innerHTML='<span class="spin"></span> Saving...';
-  var payload={
-    date:document.getElementById('f-dt').value,
-    description:document.getElementById('f-desc').value.trim(),
-    item_name:document.getElementById('f-item').value.trim(),
-    amount:parseFloat(document.getElementById('f-amt').value),
-    amount_paid:parseFloat(document.getElementById('f-paid').value),
-    expense_type:document.getElementById('f-et2').value,
-    payment_through:document.getElementById('f-pm').value,
-    payment_to:document.getElementById('f-pto').value.trim(),
-    vendor_contact:document.getElementById('f-vcon').value.trim()||null,
-    approval_by:document.getElementById('f-apby').value.trim(),
-    approval_voucher_no:document.getElementById('f-vno').value.trim(),
-    status:curSt,reference:document.getElementById('f-notes').value.trim()||null,
-    account_id:document.getElementById('f-aid').value||null,tax_amount:0,
+  var btn=document.getElementById('bsv');btn.disabled=true;
+  document.getElementById('bsv-l').innerHTML='<span class="spin"></span> Saving...';
+
+  var expDate    = document.getElementById('f-dt').value;
+  var expDesc    = document.getElementById('f-desc').value.trim();
+  var expItem    = document.getElementById('f-item').value.trim();
+  var expAmt     = parseFloat(document.getElementById('f-amt').value);
+  var expPaid    = parseFloat(document.getElementById('f-paid').value);
+  var expType    = document.getElementById('f-et2').value;
+  var payThrough = document.getElementById('f-pm').value;
+  var payTo      = document.getElementById('f-pto').value.trim();
+  var vContact   = document.getElementById('f-vcon').value.trim()||null;
+  var apBy       = document.getElementById('f-apby').value.trim();
+  var voucherNo  = document.getElementById('f-vno').value.trim();
+  var notes      = document.getElementById('f-notes').value.trim()||null;
+  var accountId  = document.getElementById('f-aid').value||null;
+
+  var expPayload={
+    date:expDate, description:expDesc, item_name:expItem,
+    amount:expAmt, amount_paid:expPaid,
+    expense_type:expType, payment_through:payThrough,
+    payment_to:payTo, vendor_contact:vContact,
+    approval_by:apBy, approval_voucher_no:voucherNo,
+    reference:notes,
+    account_id:accountId, tax_amount:0,
   };
-  var {error}=await sb.from('expenses').insert(payload);
-  if(!error){showToast('Expense saved','success');clrForm();loadExp();loadImp();}
-  else showToast('Error: '+error.message,'error');
+
+  var {data:savedExp, error}=await sb.from('expenses').insert(expPayload).select().single();
+  if(error){
+    showToast('Error saving expense: '+error.message,'error');
+    btn.disabled=false;document.getElementById('bsv-l').textContent='Save Expense';
+    return;
+  }
+
+  // ── Auto-create a linked Payment record from the expense payment details ──
+  if(expPaid>0){
+    // Map expense payment_through → payments payment_channel
+    var chanMap={bank:'bank_transfer',imprest_cash:'imprest_cash'};
+    var channel=chanMap[payThrough]||'bank_transfer';
+
+    var {data:{user}}=await sb.auth.getUser();
+    var payPayload={
+      payment_date : expDate,
+      amount       : expPaid,
+      payee_name   : payTo,
+      payee_contact: vContact,
+      payment_channel: channel,
+      reference_no : voucherNo||null,
+      expense_id   : savedExp.id,
+      bank_name    : document.getElementById('f-bank-hidden').value||null,
+      account_number: document.getElementById('f-acctno-hidden').value||null,
+      description  : 'Auto-created from expense: '+(expItem||expDesc),
+      status       : expPaid>=expAmt?'completed':'completed',
+      created_by   : user?user.id:null,
+    };
+    var {error:pe}=await sb.from('payments').insert(payPayload);
+    if(pe)console.warn('Payment auto-create failed:',pe.message);
+  }
+
+  showToast('✓ Expense saved — redirecting to Payments','success');
+  clrForm();
+
+  // Reload data first, then switch to Payments tab
+  await Promise.all([loadExp(),loadImp(),loadPayments()]);
+
+  // Switch to Payments menu automatically
+  switchMode('pay', document.getElementById('sn-pay'));
+
   btn.disabled=false;document.getElementById('bsv-l').textContent='Save Expense';
 }
 function clrForm(){
@@ -857,9 +1111,14 @@ function clrForm(){
   document.getElementById('f-dt').value=new Date().toISOString().split('T')[0];
   document.getElementById('f-et2').value='';document.getElementById('f-pm').value='';
   document.getElementById('f-et2').classList.remove('err');document.getElementById('f-pm').classList.remove('err');
-  autoMonth();clearA();curSt='pending';
-  document.querySelectorAll('#sp-main .sp').forEach(function(p){p.classList.remove('on');});
-  document.querySelector('#sp-main .sp[data-v="pending"]').classList.add('on');
+  // Reset bank account picker
+  var ba=document.getElementById('f-bank-acct');if(ba)ba.value='';
+  document.getElementById('f-bank-hidden').value='';document.getElementById('f-acctno-hidden').value='';
+  var wrap=document.getElementById('f-bank-picker-wrap');if(wrap)wrap.style.display='none';
+  // Hide payment preview
+  var ppCard=document.getElementById('pay-preview-card');if(ppCard)ppCard.style.display='none';
+  var ppHint=document.getElementById('f-paid-hint');if(ppHint)ppHint.style.display='none';
+  autoMonth();clearA();
 }
 
 // ── SAVE IMPREST ──
@@ -937,7 +1196,7 @@ function updateStats(){
 function renderExp(){
   document.getElementById('rcnt').textContent=filtered.length;
   var tb=document.getElementById('etbody');
-  if(!filtered.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted)">No expenses match the filter</td></tr>';return;}
+  if(!filtered.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted)">No expenses match the filter</td></tr>';return;}
   tb.innerHTML=filtered.map(function(e){
     var a=getA(e.account_id);
     var itm=e.item_name
@@ -951,7 +1210,6 @@ function renderExp(){
       +'<td style="font-family:var(--mono);font-weight:500">₦'+Number(e.amount).toLocaleString('en-NG',{minimumFractionDigits:2})+'</td>'
       +'<td><span class="bdg '+(e.payment_through==='imprest_cash'?'bca':'bbk')+'">'+(e.payment_through==='imprest_cash'?'Cash':'Bank')+'</span></td>'
       +'<td style="font-size:11px;color:var(--muted)">'+esc(e.approval_by||'—')+'</td>'
-      +'<td><span class="bdg '+(e.status==='paid'?'bpa':e.status==='approved'?'bap':'bpd')+'">'+esc(e.status)+'</span></td>'
       +'</tr>';
   }).join('');
   tb.querySelectorAll('tr[data-id]').forEach(function(row){
@@ -965,7 +1223,7 @@ function exportXL(){
   var wb=XLSX.utils.book_new();
   var headers=['Date','Month','Item Name','Description','Account Code','Account Name','Account Category',
     'Expense Type','Total Cost (₦)','Amount Paid (₦)','Payment Through','Payment To','Vendor Contact',
-    'Approved By','Voucher No.','Status','Notes'];
+    'Approved By','Voucher No.','Notes'];
   var rows=filtered.map(function(e){
     var a=getA(e.account_id);
     var cat=a?(a.g==='cos'?'Cost of Sales':a.g==='overhead'?'Overhead':'Gen Cost'):'';
@@ -977,13 +1235,13 @@ function exportXL(){
       e.payment_through==='imprest_cash'?'Imprest Cash':'Bank Transfer',
       e.payment_to||'',e.vendor_contact||'',
       e.approval_by||'',e.approval_voucher_no||'',
-      e.status||'',e.reference||''
+      e.reference||''
     ];
   });
   var ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
-  ws['!cols']=[12,18,18,36,12,32,14,12,16,16,15,22,15,18,12,10,30].map(function(w){return{wch:w};});
+  ws['!cols']=[12,18,18,36,12,32,14,12,16,16,15,22,15,18,12,30].map(function(w){return{wch:w};});
   // Add totals row
-  var totRow=['','','','TOTAL','','','','',filtered.reduce(function(s,e){return s+Number(e.amount);},0),filtered.reduce(function(s,e){return s+Number(e.amount_paid);},0),'','','','','','',''];
+  var totRow=['','','','TOTAL','','','','',filtered.reduce(function(s,e){return s+Number(e.amount);},0),filtered.reduce(function(s,e){return s+Number(e.amount_paid);},0),'','','','','',''];
   XLSX.utils.sheet_add_aoa(ws,[totRow],{origin:-1});
   XLSX.utils.book_append_sheet(wb,ws,'Expenses');
   var mon=document.getElementById('f-mon').options[document.getElementById('f-mon').selectedIndex].text;
@@ -1017,8 +1275,6 @@ function openEdit(e){
   document.getElementById('e-et').value=e.expense_type||'purchase';
   document.getElementById('e-pm').value=e.payment_through||'bank';
   clearEA();if(e.account_id){var a=getA(e.account_id);if(a){var k=C2K[a.c];if(k)selEA(k);}}
-  editSt=e.status||'pending';
-  document.querySelectorAll('#sp-edit .sp').forEach(function(p){p.classList.toggle('on',p.dataset.v===editSt);});
   document.getElementById('edit-modal').classList.add('op');
 }
 function closeM(){document.getElementById('edit-modal').classList.remove('op');editId=null;}
@@ -1026,17 +1282,51 @@ function mbgClick(e){if(e.target===document.getElementById('edit-modal'))closeM(
 async function updateExp(){
   var dt=document.getElementById('e-dt').value,amt=parseFloat(document.getElementById('e-amt').value);
   if(!dt||!amt){showToast('Date and amount required','error');return;}
-  var btn=document.getElementById('bupd');btn.disabled=true;document.getElementById('bupd-l').innerHTML='<span class="spin"></span> Saving...';
+  var btn=document.getElementById('bupd');btn.disabled=true;
+  document.getElementById('bupd-l').innerHTML='<span class="spin"></span> Saving...';
+
+  var newPaid   = parseFloat(document.getElementById('e-paid').value)||0;
+  var newPayTo  = document.getElementById('e-pto').value.trim()||null;
+  var newPM     = document.getElementById('e-pm').value;
+  var newVno    = document.getElementById('e-voucher_no')||document.getElementById('e-vno');
+  var newVnoVal = newVno?newVno.value.trim()||null:null;
+
   var {error}=await sb.from('expenses').update({
-    date:dt,description:document.getElementById('e-desc').value.trim()||null,item_name:document.getElementById('e-item').value.trim()||null,
-    amount:amt,amount_paid:parseFloat(document.getElementById('e-paid').value)||null,
-    expense_type:document.getElementById('e-et').value,payment_through:document.getElementById('e-pm').value,
-    payment_to:document.getElementById('e-pto').value.trim()||null,vendor_contact:document.getElementById('e-vcon').value.trim()||null,
-    approval_by:document.getElementById('e-apby').value.trim()||null,approval_voucher_no:document.getElementById('e-vno').value.trim()||null,
-    status:editSt,reference:document.getElementById('e-notes').value.trim()||null,account_id:document.getElementById('e-aid').value||null,tax_amount:0,
+    date:dt,
+    description:document.getElementById('e-desc').value.trim()||null,
+    item_name:document.getElementById('e-item').value.trim()||null,
+    amount:amt, amount_paid:newPaid,
+    expense_type:document.getElementById('e-et').value,
+    payment_through:newPM,
+    payment_to:newPayTo,
+    vendor_contact:document.getElementById('e-vcon').value.trim()||null,
+    approval_by:document.getElementById('e-apby').value.trim()||null,
+    approval_voucher_no:newVnoVal,
+    reference:document.getElementById('e-notes').value.trim()||null,
+    account_id:document.getElementById('e-aid').value||null,
+    tax_amount:0,
   }).eq('id',editId);
-  if(!error){showToast('Updated','success');closeM();loadExp();loadImp();}
-  else showToast('Error: '+error.message,'error');
+
+  if(!error){
+    // Sync the auto-created payment linked to this expense (if it exists)
+    if(newPaid>0){
+      var chanMap={bank:'bank_transfer',imprest_cash:'imprest_cash'};
+      var channel=chanMap[newPM]||'bank_transfer';
+      // Check if a linked payment already exists for this expense
+      var {data:existingPays}=await sb.from('payments').select('id').eq('expense_id',editId).limit(1);
+      if(existingPays&&existingPays.length>0){
+        // Update the existing linked payment to stay in sync
+        await sb.from('payments').update({
+          payment_date:dt, amount:newPaid,
+          payee_name:newPayTo||'', payment_channel:channel,
+          reference_no:newVnoVal,
+          status:'completed',
+        }).eq('id',existingPays[0].id);
+      }
+    }
+    showToast('✓ Updated','success');
+    closeM();loadExp();loadImp();loadPayments();
+  }else showToast('Error: '+error.message,'error');
   btn.disabled=false;document.getElementById('bupd-l').textContent='Save Changes';
 }
 async function doDelete(){
@@ -1059,8 +1349,8 @@ function handleXL(inp){
       var ok=rows.filter(function(r){return !r.errs.length;}).length,err=rows.length-ok;
       document.getElementById('xl-sum').innerHTML='<span class="isp isk">✓ '+ok+' valid</span>'+(err?'<span class="isp ise">✕ '+err+' errors</span>':'')+'<span class="isp" style="background:var(--paper);color:var(--muted)">'+rows.length+' total</span>';
       document.getElementById('xl-body').innerHTML=rows.map(function(r){
-        var a=ACC[r.ak];var etC=r.et==='imprest'?'bim':'bpu';var stC=r.st==='paid'?'bpa':r.st==='approved'?'bap':'bpd';
-        return '<tr><td style="font-family:var(--mono);font-size:10px;color:var(--muted)">'+r.i+'</td><td style="font-family:var(--mono);font-size:10px">'+esc(r.dt||'—')+'</td><td>'+esc((r.desc||'').slice(0,22))+'</td><td style="font-family:var(--mono)">₦'+r.amt.toLocaleString('en-NG',{minimumFractionDigits:0})+'</td><td><span class="bdg '+etC+'">'+esc(r.et)+'</span></td><td><span class="bdg '+stC+'">'+esc(r.st)+'</span></td><td>'+(!r.errs.length?'<span class="rok">✓</span>':'<span class="rer" title="'+esc(r.errs.join(', '))+'">✕</span>')+'</td></tr>';
+        var etC=r.et==='imprest'?'bim':'bpu';
+        return '<tr><td style="font-family:var(--mono);font-size:10px;color:var(--muted)">'+r.i+'</td><td style="font-family:var(--mono);font-size:10px">'+esc(r.dt||'—')+'</td><td>'+esc((r.desc||'').slice(0,22))+'</td><td style="font-family:var(--mono)">₦'+r.amt.toLocaleString('en-NG',{minimumFractionDigits:0})+'</td><td><span class="bdg '+etC+'">'+esc(r.et)+'</span></td><td>'+(!r.errs.length?'<span class="rok">✓</span>':'<span class="rer" title="'+esc(r.errs.join(', '))+'">✕</span>')+'</td></tr>';
       }).join('');
       document.getElementById('xl-area').style.display='block';
     }catch(err){showToast('Cannot read file: '+err.message,'error');}
@@ -1070,15 +1360,14 @@ function handleXL(inp){
 function parseXLRow(row,idx){
   var get=function(){for(var i=0;i<arguments.length;i++){var k=arguments[i];var f=Object.keys(row).find(function(rk){return rk.toLowerCase().replace(/[\s*]/g,'').includes(k.toLowerCase());});if(f&&row[f]!=='')return String(row[f]).trim();}return '';};
   var dtR=get('date'),desc=get('description','item','desc','name'),codeR=get('accountcode','account_code','code'),accN=get('accountname','account_name','account');
-  var amtR=get('amount','totalcost','total','cost','value'),stR=get('status'),etR=get('expensetype','expense_type','type');
+  var amtR=get('amount','totalcost','total','cost','value'),etR=get('expensetype','expense_type','type');
   var dt='';if(dtR){var d=new Date(dtR);if(!isNaN(d))dt=d.toISOString().split('T')[0];else dt=dtR;}
   var amt=parseFloat(String(amtR).replace(/[,₦$\s]/g,''))||0;
   var ak='';if(codeR){var cc=codeR.replace(/[^0-9]/g,'').slice(-4);ak=C2K[cc]||'';}
   if(!ak&&accN){var lo=accN.toLowerCase();ak=(Object.entries(ACC).find(function([k,v]){return v.n.toLowerCase().includes(lo)||lo.includes(v.n.toLowerCase().slice(0,6));})||[])[0]||'';}
-  var st=['paid','approved','pending'].includes((stR||'').toLowerCase())?(stR||'').toLowerCase():'pending';
   var et=['imprest','purchase'].includes((etR||'').toLowerCase())?(etR||'').toLowerCase():'purchase';
   var errs=[];if(!dt)errs.push('missing date');if(!desc)errs.push('missing description');if(!amt)errs.push('missing amount');
-  return{i:idx,dt,desc,ak,amt,st,et,errs};
+  return{i:idx,dt,desc,ak,amt,et,errs};
 }
 async function importAll(){
   var rows=(window._xlRows||[]).filter(function(r){return !r.errs.length;});
@@ -1088,7 +1377,7 @@ async function importAll(){
   for(var i=0;i<rows.length;i++){
     document.getElementById('bimp-p').textContent=(i+1)+' / '+rows.length;
     var r=rows[i];var a=ACC[r.ak];var uid=a?aUUIDs[a.c]:null;
-    var {error}=await sb.from('expenses').insert({description:r.desc,date:r.dt,amount:r.amt,status:r.st,expense_type:r.et,account_id:uid||null,tax_amount:0});
+    var {error}=await sb.from('expenses').insert({description:r.desc,date:r.dt,amount:r.amt,expense_type:r.et,account_id:uid||null,tax_amount:0});
     if(!error)saved++;else failed++;
   }
   document.getElementById('bimp-p').textContent='';btn.disabled=false;document.getElementById('bimp-l').textContent='⬆ Import All Valid Rows';
@@ -1097,14 +1386,14 @@ async function importAll(){
 }
 function dlTpl(){
   var wb=XLSX.utils.book_new();
-  var hdr=['Date *','Item Name *','Description *','Account Code *','Account Name','Total Cost (₦) *','Amount Paid','Expense Type','Payment Through','Payment To','Vendor Contact','Approved By','Voucher No.','Status'];
+  var hdr=['Date *','Item Name *','Description *','Account Code *','Account Name','Total Cost (₦) *','Amount to be Paid','Expense Type','Payment Through','Payment To','Vendor Contact','Approved By','Voucher No.'];
   var rows=[
-    ['2026-03-01','Gloves','50 pairs exam gloves ward A','6010','Drugs & Consumables',45000,45000,'purchase','bank','Drugfield Pharmacy','08012345678','Dr. Adeyemi','APV-001','paid'],
-    ['2026-03-05','Electricity','IKEDC bill March 2026','7030','Electricity',62000,62000,'purchase','bank','IKEDC','','Admin Mgr','APV-002','paid'],
-    ['2026-03-08','Diesel','200L AGO for generator','7040','Diesel / Petrol',156000,156000,'imprest','imprest_cash','Total Energies','','Dr. Adeyemi','APV-003','paid'],
-    ['2026-03-10','Transport','Staff bus fuel April','8010','Transport',25000,25000,'imprest','imprest_cash','Driver Musa','','Admin Mgr','APV-004','pending'],
+    ['2026-03-01','Gloves','50 pairs exam gloves ward A','6010','Drugs & Consumables',45000,45000,'purchase','bank','Drugfield Pharmacy','08012345678','Dr. Adeyemi','APV-001'],
+    ['2026-03-05','Electricity','IKEDC bill March 2026','7030','Electricity',62000,62000,'purchase','bank','IKEDC','','Admin Mgr','APV-002'],
+    ['2026-03-08','Diesel','200L AGO for generator','7040','Diesel / Petrol',156000,156000,'imprest','imprest_cash','Total Energies','','Dr. Adeyemi','APV-003'],
+    ['2026-03-10','Transport','Staff bus fuel April','8010','Transport',25000,25000,'imprest','imprest_cash','Driver Musa','','Admin Mgr','APV-004'],
   ];
-  var ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);ws['!cols']=[12,18,36,14,32,14,12,12,14,22,14,16,12,10].map(function(w){return{wch:w};});
+  var ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);ws['!cols']=[12,18,36,14,32,14,12,12,14,22,14,16,12].map(function(w){return{wch:w};});
   XLSX.utils.book_append_sheet(wb,ws,'Expenses');
   var r2=[['Code','Account Name','Category'],...Object.values(ACC).map(function(a){return[a.c,a.n,a.g==='cos'?'Cost of Sales':a.g==='overhead'?'Overhead':'Gen Cost'];})];
   var ws2=XLSX.utils.aoa_to_sheet(r2);ws2['!cols']=[{wch:10},{wch:44},{wch:14}];
@@ -1125,6 +1414,386 @@ function showToast(msg,type){
   setTimeout(function(){t.classList.remove('sh');},4000);
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeM();closeZ();}});
+
+// ── PAYMENTS ──
+var payments=[], outstandingExp=[];
+var payMap={};
+
+// Official Hopestone bank accounts
+var HOPESTONE_ACCOUNTS=[
+  {label:'Sterling Bank — 0098570141', bank:'Sterling Bank', acct:'0098570141'},
+  {label:'Sterling Bank — 0095508587', bank:'Sterling Bank', acct:'0095508587'},
+  {label:'Sterling Bank — 0095508714', bank:'Sterling Bank', acct:'0095508714'},
+  {label:'Moniepoint — 8033950102',    bank:'Moniepoint',    acct:'8033950102'},
+];
+
+// Parse "Bank|AccountNo" value and fill hidden fields
+function fillBankDetails(val, bankId, acctId){
+  if(!val){document.getElementById(bankId).value='';document.getElementById(acctId).value='';return;}
+  var parts=val.split('|');
+  document.getElementById(bankId).value=parts[0]||'';
+  document.getElementById(acctId).value=parts[1]||'';
+}
+
+// Show/hide bank account picker in Expense form depending on Payment Through
+function toggleExpBankPicker(){
+  var pm=document.getElementById('f-pm').value;
+  var wrap=document.getElementById('f-bank-picker-wrap');
+  if(wrap)wrap.style.display=(pm==='bank')?'':'none';
+  if(pm!=='bank'){
+    var ba=document.getElementById('f-bank-acct');if(ba)ba.value='';
+    document.getElementById('f-bank-hidden').value='';
+    document.getElementById('f-acctno-hidden').value='';
+  }
+}
+
+// Show/hide bank fields in Payment form based on channel selection
+function toggleBankFields(){
+  var ch=document.getElementById('pay-channel').value;
+  var showBank=['bank_transfer','cheque','pos','mobile_transfer'].includes(ch);
+  document.getElementById('sending-bank-fields').style.opacity=showBank?'1':'0.4';
+}
+
+async function loadPayments(){
+  // Load all payments
+  var {data:pdata,error:pe}=await sb.from('payments').select('*').order('payment_date',{ascending:false}).limit(300);
+  if(!pe&&pdata){
+    payments=pdata;
+    pdata.forEach(function(p){payMap[p.id]=p;});
+    renderPayments();
+  }
+  // Load outstanding expenses
+  var {data:odata}=await sb.from('expenses').select('*').order('date',{ascending:false});
+  if(odata){
+    outstandingExp=odata.filter(function(e){return Number(e.amount)>Number(e.amount_paid||0);});
+    renderOutstanding();
+  }
+  updatePayStats();
+  renderTransferAlerts();
+}
+
+// ── Alert: Bank-transfer expenses with no linked payment record ──
+function renderTransferAlerts(){
+  // Find expenses paid via bank transfer that have amount_paid > 0
+  // but have no payment record linked to them in the payments table
+  var linkedExpIds=new Set(payments.filter(function(p){return p.expense_id;}).map(function(p){return p.expense_id;}));
+
+  var unrecorded=expenses.filter(function(e){
+    return e.payment_through==='bank'
+      && Number(e.amount_paid||0)>0
+      && !linkedExpIds.has(e.id);
+  });
+
+  var banner=document.getElementById('transfer-alert-banner');
+  var list=document.getElementById('transfer-alert-list');
+
+  if(!unrecorded.length){
+    banner.style.display='none';
+    return;
+  }
+
+  banner.style.display='flex';
+
+  // Build the list — store index so we can retrieve the full object on click
+  list.innerHTML=unrecorded.map(function(e,idx){
+    var itm=esc((e.item_name||e.description||'Expense').slice(0,40));
+    var amt=fmt(e.amount_paid);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid #f5c96a;border-radius:7px;padding:7px 11px;gap:10px">'
+      +'<div>'
+        +'<span style="font-size:12px;font-weight:500;color:var(--ink)">'+itm+'</span>'
+        +'<span style="font-size:11px;color:var(--muted);margin-left:8px;font-family:var(--mono)">'+esc(e.date||'')+'</span>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-family:var(--mono);font-weight:600;color:var(--amber)">'+amt+'</span>'
+        +'<button class="pay-now-btn" data-eid="'+e.id+'" data-idx="'+idx+'" style="font-size:11px;padding:6px 14px">💳 Record Now</button>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  // Use event delegation on the list container
+  list.addEventListener('click',function(ev){
+    var btn=ev.target.closest('.pay-now-btn');
+    if(!btn)return;
+    ev.stopPropagation();
+    var idx=parseInt(btn.dataset.idx,10);
+    var exp=unrecorded[idx];
+    if(exp)linkExpenseToPayForm(exp);
+  },{once:false});
+}
+
+function updatePayStats(){
+  var tot=payments.reduce(function(s,p){return s+Number(p.amount);},0);
+  var now=new Date();
+  var ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var monthPay=payments.filter(function(p){return p.payment_date&&p.payment_date.startsWith(ym);});
+  var monthTot=monthPay.reduce(function(s,p){return s+Number(p.amount);},0);
+  var outTot=outstandingExp.reduce(function(s,e){return s+(Number(e.amount)-Number(e.amount_paid||0));},0);
+  document.getElementById('pay-outstanding').textContent=fmt(outTot);
+  document.getElementById('pay-out-cnt').textContent=outstandingExp.length+' unpaid expense'+(outstandingExp.length!==1?'s':'');
+  document.getElementById('pay-month-tot').textContent=fmt(monthTot);
+  document.getElementById('pay-month-cnt').textContent=monthPay.length+' payment'+(monthPay.length!==1?'s':'');
+  document.getElementById('pay-all-tot').textContent=fmt(tot);
+  document.getElementById('pay-all-cnt').textContent=payments.length+' record'+(payments.length!==1?'s':'');
+}
+
+function renderOutstanding(){
+  var tb=document.getElementById('out-tbody');
+  if(!outstandingExp.length){
+    tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--green);font-family:var(--mono);font-size:12px">✓ All expenses fully paid</td></tr>';
+    return;
+  }
+  tb.innerHTML=outstandingExp.map(function(e){
+    var paid=Number(e.amount_paid||0);
+    var bal=Number(e.amount)-paid;
+    var itm=e.item_name||e.description||'—';
+    return '<tr>'
+      +'<td><span style="font-family:var(--mono);font-size:11px">'+esc(e.date||'')+'</span></td>'
+      +'<td><strong style="font-weight:500">'+esc(itm.slice(0,28))+'</strong></td>'
+      +'<td style="font-size:11px;color:var(--muted)">'+esc(e.payment_to||'—')+'</td>'
+      +'<td style="font-family:var(--mono)">'+fmt(e.amount)+'</td>'
+      +'<td style="font-family:var(--mono);color:var(--green)">'+fmt(paid)+'</td>'
+      +'<td><span class="bal-due">'+fmt(bal)+'</span></td>'
+      +'<td style="white-space:nowrap"><button class="pay-now-btn" data-eid="'+e.id+'">💳 Pay Now</button></td>'
+      +'</tr>';
+  }).join('');
+  // Use event delegation on the tbody — avoids stale closures and works reliably
+  tb.addEventListener('click',function(ev){
+    var btn=ev.target.closest('.pay-now-btn');
+    if(!btn)return;
+    ev.stopPropagation();
+    var eid=btn.dataset.eid;
+    // Look up from outstandingExp directly (always fresh)
+    var exp=outstandingExp.find(function(x){return x.id===eid;})||expMap[eid];
+    if(exp)linkExpenseToPayForm(exp);
+    else console.warn('Pay Now: expense not found for id',eid);
+  },{once:false});
+}
+
+function linkExpenseToPayForm(e){
+  // Accept either a full expense object or an ID string (backwards compat)
+  if(typeof e==='string'){
+    e=outstandingExp.find(function(x){return x.id===e;})||expMap[e];
+    if(!e){console.warn('linkExpenseToPayForm: expense not found');return;}
+  }
+
+  var eid=e.id;
+
+  // Store the linked expense ID
+  document.getElementById('pay-exp-id').value=eid;
+
+  // ── 1. Payment Channel ← Payment Through ──
+  var chanMap={bank:'bank_transfer',imprest_cash:'imprest_cash'};
+  var mappedChannel=chanMap[e.payment_through]||'';
+  document.getElementById('pay-channel').value=mappedChannel;
+  toggleBankFields();
+
+  // ── 2. Payee Name ← Payment To ──
+  document.getElementById('pay-payee').value=e.payment_to||'';
+  document.getElementById('pay-contact').value=e.vendor_contact||'';
+
+  // ── 3. Amount ← Outstanding balance ──
+  var bal=Number(e.amount)-Number(e.amount_paid||0);
+  document.getElementById('pay-amt').value=bal.toFixed(2);
+
+  // ── 4. Sending Bank ← match against linked payment or default account ──
+  // Find the most recent payment linked to this expense to get bank details
+  var linkedPay=payments.find(function(p){return p.expense_id===eid;});
+  var bankPickerVal='';
+  if(linkedPay&&linkedPay.bank_name&&linkedPay.account_number){
+    bankPickerVal=linkedPay.bank_name+'|'+linkedPay.account_number;
+  }
+  var bankPicker=document.getElementById('pay-bank-acct');
+  if(bankPickerVal){
+    // Try to match against dropdown options
+    var matched=false;
+    for(var i=0;i<bankPicker.options.length;i++){
+      if(bankPicker.options[i].value===bankPickerVal){bankPicker.value=bankPickerVal;matched=true;break;}
+    }
+    if(!matched)bankPicker.value='';
+  } else {
+    bankPicker.value='';
+  }
+  fillBankDetails(bankPicker.value,'pay-bank','pay-acctno');
+
+  // Pre-fill receiving account name from Payment To
+  document.getElementById('pay-recv-acctname').value=e.payment_to||'';
+
+  // Payment date defaults to today (not expense date, payment may happen later)
+  document.getElementById('pay-dt').value=new Date().toISOString().split('T')[0];
+
+  // Show linked banner
+  var name=(e.item_name||e.description||'Expense').slice(0,40);
+  document.getElementById('pay-linked-name').textContent=name;
+  document.getElementById('pay-linked-bal').textContent=fmt(bal)+' outstanding';
+  document.getElementById('pay-linked-banner').style.display='flex';
+
+  // Switch to Payments panel if not already there, then scroll to form
+  if(!document.getElementById('pnl-pay').classList.contains('on')){
+    switchMode('pay',document.getElementById('sn-pay'));
+  }
+  setTimeout(function(){
+    document.getElementById('pay-form-card').scrollIntoView({behavior:'smooth',block:'start'});
+  },120);
+}
+
+function unlinkExpense(){
+  document.getElementById('pay-exp-id').value='';
+  document.getElementById('pay-linked-banner').style.display='none';
+  document.getElementById('pay-linked-name').textContent='';
+  document.getElementById('pay-linked-bal').textContent='';
+}
+
+function clrPayForm(){
+  ['pay-amt','pay-payee','pay-contact','pay-bank','pay-acctno','pay-ref','pay-notes',
+   'pay-recv-bank','pay-recv-acctno','pay-recv-acctname'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('pay-dt').value=new Date().toISOString().split('T')[0];
+  document.getElementById('pay-channel').value='';
+  var ba=document.getElementById('pay-bank-acct');if(ba)ba.value='';
+  unlinkExpense();
+}
+
+async function savePayment(){
+  var dt=document.getElementById('pay-dt').value;
+  var amt=parseFloat(document.getElementById('pay-amt').value);
+  var payee=document.getElementById('pay-payee').value.trim();
+  var channel=document.getElementById('pay-channel').value;
+  var ref=document.getElementById('pay-ref').value.trim();
+  if(!dt||!amt||!payee||!channel){
+    showToast('Date, Amount, Payee and Channel are required','error');return;
+  }
+  var btn=document.getElementById('pay-save-btn');btn.disabled=true;
+  document.getElementById('pay-save-lbl').innerHTML='<span class="spin"></span> Saving...';
+  var {data:{user}}=await sb.auth.getUser();
+  var expId=document.getElementById('pay-exp-id').value||null;
+  var payload={
+    payment_date:dt,
+    amount:amt,
+    payee_name:payee,
+    payee_contact:document.getElementById('pay-contact').value.trim()||null,
+    payment_channel:channel,
+    bank_name:document.getElementById('pay-bank').value.trim()||null,
+    account_number:document.getElementById('pay-acctno').value.trim()||null,
+    reference_no:ref||null,
+    receiving_bank_name:document.getElementById('pay-recv-bank').value.trim()||null,
+    receiving_account_no:document.getElementById('pay-recv-acctno').value.trim()||null,
+    receiving_account_name:document.getElementById('pay-recv-acctname').value.trim()||null,
+    expense_id:expId,
+    description:document.getElementById('pay-notes').value.trim()||null,
+    status:'completed',
+    created_by:user?user.id:null
+  };
+  var {error}=await sb.from('payments').insert(payload);
+  if(!error){
+    // Update expense amount_paid if linked
+    if(expId&&expMap[expId]){
+      var e=expMap[expId];
+      var newPaid=Math.min(Number(e.amount), Number(e.amount_paid||0)+amt);
+      var newStatus=newPaid>=Number(e.amount)?'paid':'approved';
+      await sb.from('expenses').update({amount_paid:newPaid,status:newStatus}).eq('id',expId);
+    }
+    showToast('✓ Payment recorded','success');
+    clrPayForm();loadPayments();loadExp();loadImp();
+  }else showToast('Error: '+error.message,'error');
+  btn.disabled=false;document.getElementById('pay-save-lbl').textContent='Record Payment';
+}
+
+function renderPayments(){
+  document.getElementById('pay-cnt').textContent=payments.length;
+  var tb=document.getElementById('pay-tbody');
+  if(!payments.length){
+    tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">No payments recorded yet</td></tr>';
+    return;
+  }
+  var chLabel={bank_transfer:'Bank Transfer',cheque:'Cheque',cash:'Cash',pos:'POS',mobile_transfer:'Mobile',imprest_cash:'Imprest Cash'};
+  tb.innerHTML=payments.map(function(p){
+    var linkedExp=p.expense_id&&expMap[p.expense_id];
+    var linkedTxt=linkedExp?(linkedExp.item_name||linkedExp.description||'Expense').slice(0,22):'—';
+    var sendingBank=p.bank_name
+      ?esc(p.bank_name)+(p.account_number?'<div style="font-size:10px;font-family:var(--mono);color:var(--muted)">'+esc(p.account_number)+'</div>':'')
+      :'—';
+    var recvBank=p.receiving_bank_name
+      ?esc(p.receiving_bank_name)+(p.receiving_account_no?'<div style="font-size:10px;font-family:var(--mono);color:var(--muted)">'+esc(p.receiving_account_no)+'</div>':'')
+      :'—';
+    var recvName=p.receiving_account_name?'<div style="font-size:10px;color:var(--muted)">'+esc(p.receiving_account_name)+'</div>':'';
+    var isAuto=p.description&&p.description.startsWith('Auto-created from expense');
+    var autoTag=isAuto?'<span style="font-size:9px;background:var(--blue-lt);color:var(--blue-dp);border-radius:4px;padding:1px 5px;margin-left:4px;font-family:var(--mono)">auto</span>':'';
+    var stC=p.status==='completed'?'bap':p.status==='reversed'?'bpd':'bpa';
+    return '<tr>'
+      +'<td><span style="font-family:var(--mono);font-size:11px">'+esc(p.payment_date||'')+'</span></td>'
+      +'<td><strong style="font-weight:500">'+esc(p.payee_name||'')+'</strong>'+autoTag
+        +(p.payee_contact?'<div style="font-size:10px;color:var(--muted)">'+esc(p.payee_contact)+'</div>':'')+'</td>'
+      +'<td style="font-family:var(--mono);font-weight:600;color:var(--green)">'+fmt(p.amount)+'</td>'
+      +'<td><span class="bdg bbk" style="font-size:9px">'+esc(chLabel[p.payment_channel]||p.payment_channel||'')+'</span></td>'
+      +'<td style="font-size:11px;color:var(--muted);font-family:var(--mono)">'+esc(p.reference_no||'—')+'</td>'
+      +'<td style="font-size:11px">'+sendingBank+'</td>'
+      +'<td style="font-size:11px">'+recvBank+recvName+'</td>'
+      +'<td style="font-size:11px;color:var(--muted)">'+esc(linkedTxt)+'</td>'
+      +'<td><span class="bdg '+stC+'">'+esc(p.status)+'</span></td>'
+      +'<td><button class="pdel" data-pid="'+p.id+'" title="Delete payment">🗑</button></td>'
+      +'</tr>';
+  }).join('');
+  tb.querySelectorAll('.pdel').forEach(function(btn){
+    btn.addEventListener('click',function(ev){
+      ev.stopPropagation();deletePayment(btn.dataset.pid);
+    });
+  });
+}
+
+async function deletePayment(pid){
+  if(!confirm('Delete this payment record? This cannot be undone.'))return;
+  var p=payMap[pid];
+  var {error}=await sb.from('payments').delete().eq('id',pid);
+  if(!error){
+    // Reverse amount_paid on linked expense
+    if(p&&p.expense_id&&expMap[p.expense_id]){
+      var e=expMap[p.expense_id];
+      var newPaid=Math.max(0,Number(e.amount_paid||0)-Number(p.amount));
+      var newStatus=newPaid<Number(e.amount)?'approved':'paid';
+      await sb.from('expenses').update({amount_paid:newPaid,status:newStatus}).eq('id',p.expense_id);
+    }
+    showToast('Payment deleted','success');loadPayments();loadExp();
+  }else showToast('Error: '+error.message,'error');
+}
+
+function exportPaymentsXL(){
+  if(!payments.length){showToast('No payments to export','error');return;}
+  var wb=XLSX.utils.book_new();
+  var chLabel={bank_transfer:'Bank Transfer',cheque:'Cheque',cash:'Cash',pos:'POS',mobile_transfer:'Mobile Transfer',imprest_cash:'Imprest Cash'};
+  var hdr=[
+    'Payment Date','Payee Name','Payee Contact','Amount (₦)','Channel',
+    'Our Bank (Sending)','Our Account No.',
+    'Reference / Cheque No.',
+    'Payee Bank Name','Payee Account No.','Payee Account Name',
+    'Linked Expense','Description','Status'
+  ];
+  var rows=payments.map(function(p){
+    var linkedExp=p.expense_id&&expMap[p.expense_id];
+    return[
+      p.payment_date||'',
+      p.payee_name||'',
+      p.payee_contact||'',
+      Number(p.amount)||0,
+      chLabel[p.payment_channel]||p.payment_channel||'',
+      p.bank_name||'',
+      p.account_number||'',
+      p.reference_no||'',
+      p.receiving_bank_name||'',
+      p.receiving_account_no||'',
+      p.receiving_account_name||'',
+      linkedExp?(linkedExp.item_name||linkedExp.description||''):'',
+      p.description||'',
+      p.status||''
+    ];
+  });
+  var totRow=['TOTAL','','',payments.reduce(function(s,p){return s+Number(p.amount);},0),'','','','','','','','','',''];
+  var ws=XLSX.utils.aoa_to_sheet([hdr,...rows,totRow]);
+  ws['!cols']=[14,22,16,14,16,14,16,18,16,16,22,28,28,12].map(function(w){return{wch:w};});
+  XLSX.utils.book_append_sheet(wb,ws,'Payments');
+  XLSX.writeFile(wb,'Hopestone_Payments.xlsx');
+  showToast('Exported '+payments.length+' payments','success');
+}
 
 initAuth();
 </script>
